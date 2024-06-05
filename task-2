@@ -1,0 +1,186 @@
+//Smart weather reporting system
+#include <LiquidCrystal.h>
+//temperature sensor variables
+float temp_vout;   
+float temp; 
+float voltage;
+ //humidity measurement
+int humiditysensorOutput = 0;
+//atmosphericpressure measurement
+int atmosphericpressuresensorOutput = 0;
+//gas sensor variables
+int gas_sensor_port = A1;
+int gas_sensor_value = 0;
+//rainfall measurement variables
+float rain;
+const int triggerPin = 10;
+const int echoPin = 9;
+long duration;
+//wind speed measurement variables
+float V_wind = 0;
+float Windspeedfloat;
+int Windspeedint;
+//LCD 
+LiquidCrystal lcd(8, 2, 6, 5, 4, 3); //Parameters: (rs, enable, d4, d5, d6, d7)
+//WIFI module variables
+String ssid     = "Simulator Wifi";  // SSID to connect to
+String password = "";   //virtual wifi has no password 
+String host     = "api.thingspeak.com"; // Open Weather Map API
+const int httpPort   = 80;
+String url     = "/update?api_key=7C7H3EIN15KJ5KTV&field1="; //ThingSpeak Channel API Key
+//setting up the wifi module
+void setupESP8266(void)    
+{
+  // Start our ESP8266 Serial Communication
+  Serial.begin(115200);   // Baud rate 
+  Serial.println("AT");   // Serial connection on Tx / Rx port to ESP8266
+  delay(10);              // Wait a little for the ESP to respond 
+  if (Serial.find("OK"))
+    Serial.println("ESP8266 OK!!!");  // Connect to Simulator Wifi
+  
+  Serial.println("AT+CWJAP=\"" + ssid + "\",\"" + password + "\""); //AT+CWLAP – list nearby available WiFi networks
+  delay(10);                         // Wait a little for the ESP to respond
+  
+  if (Serial.find("OK"))
+    Serial.println("Connected to WiFi!!!");     // Open TCP connection to the host:
+ 
+  //ESP8266 connects to the server as a TCP client. 
+ 
+  Serial.println("AT+CIPSTART=\"TCP\",\"" + host + "\"," + httpPort);
+  delay(50);                                   // Wait a little for the ESP to respond
+  
+  if (Serial.find("OK")) 
+   Serial.println("ESP8266 Connected to server!!!") ;
+}
+
+//Sends data to Thingspeak
+void send_data(void) 
+{
+  // Construct HTTP call
+  String httpPacket = "GET " + url + String(temp) + "&field2=" + String(map(humiditysensorOutput, 0, 1023, 10, 70)) + "&field3=" + String(map(atmosphericpressuresensorOutput, 0, 1023, 800, 1200)) + "&field4=" + String(gas_sensor_value) + "&field5=" + String(rain) +"&field6=" + String(Windspeedfloat) + " HTTP/1.1\r\nHost: " + host + "\r\n\r\n";
+  int length = httpPacket.length();
+  // Send our message length
+  Serial.print("AT+CIPSEND=");
+  Serial.println(length);
+  delay(10);        // Wait a little for the ESP to respond if (!Serial.find(">")) return -1;
+  // Send our http request
+  Serial.print(httpPacket);
+  delay(10);       // Wait a little for the ESP to respond
+  if (Serial.find("SEND OK\r\n"))
+    Serial.println("ESP8266 sends data to the server");
+}
+
+void setup() 
+{
+  pinMode(A1, INPUT);     //gas sensor analog input 
+  pinMode(7, OUTPUT);     //gas sensor digital output
+  pinMode(A0, INPUT);     //temperature sensor analog input
+  pinMode(A2, INPUT);     //potentiometer analog input
+  setupESP8266();
+  lcd.begin(16,2);
+  pinMode(triggerPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  
+}
+
+void loop() 
+{
+  
+  //for temperature sensor
+  temp_vout = analogRead(A0);
+  voltage = temp_vout * 0.0048828125; //convert analog value between 0 to 1023 with 5000mV/5V ADC 
+  temp = (voltage - 0.5) * 100.0;
+  Serial.println("Current temperature: " + String(temp));
+  Serial.print("celcius");
+  delay(2000);
+  //temperature LCD output
+  lcd.setCursor(0,0);        // adjust cursor
+  lcd.print("Temp: ");
+  lcd.print(temp);      
+  lcd.print("celcius");
+  //for gas sensor 
+  gas_sensor_value = analogRead(gas_sensor_port);
+  Serial.println("Gas sensor value: " + String(gas_sensor_value));
+  if (gas_sensor_value > 150)
+  {
+    tone(7,523,1000);
+  }
+  
+  //for rainfall measurement
+  digitalWrite(triggerPin, LOW);
+  delayMicroseconds(2);
+  // Sets the trigger pin to HIGH state for 10 microseconds
+  digitalWrite(triggerPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(triggerPin, LOW);
+  // Reads the echo pin, and returns the sound wave travel time in microseconds
+  duration = pulseIn(echoPin, HIGH);
+  rain = 0.01723 * duration;
+  Serial.println("Rainfall: " + String(rain));
+  Serial.print("%");
+ 
+  //humidity value print
+  humiditysensorOutput = analogRead(A2);
+  Serial.print("Humidity:    "); // Printing out Humidity Percentage
+  Serial.print(map(humiditysensorOutput, 0, 1023, 10, 70));
+  Serial.print("%");
+  //humidity LCD output
+  lcd.setCursor(0,1);        // adjust cursor
+  lcd.print("Humidity:    ");
+  lcd.print(map(humiditysensorOutput, 0, 1023, 10, 70));      
+  lcd.println("%");
+  delay(3000);
+   lcd.setCursor(0,0); // Sets the location at which subsequent text written to the LCD will be displayed
+  lcd.print("Rainfall: "); // Prints string "Rainfall" on the LCD
+  lcd.print(rain); // Prints the distance value from the sensor
+  lcd.println("%");
+  delay(1000);
+  //atmosphericmeasure measurement
+ atmosphericpressuresensorOutput = analogRead(A2);
+  //atm pressure reading print
+  Serial.print("atmosphericpressure: "); // Printing out atmosphericpressure
+  Serial.print(map(atmosphericpressuresensorOutput, 0, 1023, 800, 1200));
+  Serial.println(" millibars");
+  //atmosphericpressure LCD output
+  lcd.setCursor(0,1);        // adjust cursor
+  lcd.print("Atmpressure: ");
+  lcd.print(map(atmosphericpressuresensorOutput, 0, 1023, 800, 1200));      
+  lcd.print("mb");
+  delay(3000);
+ 
+  //for wind speed measurement
+  float V_wind = analogRead(A2) * (5.0 / 1023.0);  
+  // Voltage converted to MPH
+  Windspeedint = (V_wind - 0.4) * 10 * 2.025 * 2.237;     // For LCD screen output  
+  Windspeedfloat = (V_wind - 0.4) * 10 * 2.025 * 2.237; // For Serial monitor output
+  //wind speed LCD output
+  lcd.setCursor(0,0);        // adjust cursor
+  lcd.print("Wind speed");
+  lcd.print(" ");
+  if (V_wind < 0.4)
+  {         
+    lcd.print("0");
+  }     	 
+  else 
+  {				      
+    lcd.print(Windspeedint);
+  }
+  lcd.print("MPH");
+  //wind speed serial monitor output
+  Serial.print("Wind Speed: ");       
+  if (Windspeedfloat <= 0)
+  {            
+    Serial.print("0.0");}				
+  else{									 
+    Serial.print(Windspeedfloat);}	// Output Wind speed value
+  Serial.println(" MPH");		
+
+lcd.setCursor(0,1);        // adjust cursor
+  lcd.print("Gas senor val:");
+  lcd.print(gas_sensor_value);      
+  delay(5000);		
+  
+  //send data to thingspeak
+  send_data();
+  delay(1000);      // delay changed for faster analytics
+}
