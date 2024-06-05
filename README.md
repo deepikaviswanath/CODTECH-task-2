@@ -12,11 +12,11 @@ Mentor : SRAVANI GOUNI
 
 Overview of the project
 
-PROJECT: weather monitoring system
+PROJECT: weather monitoring statiom
 
 Objective
 
-The objective of this project is to collect,analyze and disseminate real-time data on various atmospheric conditions to support a range of applications.
+The objective of this project for data collection,real-time monitoring,local forecasting,climate data archieve,public safety and alerts.
 
 Key activities
 •	Weather Forecasting*: Providing accurate and timely weather predictions to inform the public, businesses, and governments.
